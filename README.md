@@ -52,6 +52,10 @@ http://127.0.0.1:8000/redoc
 
 This project supports **MCP Mode**, allowing tools and automation integrations.
 
-### Run MCP server manually
+### Run API
 ```bash
-python main.py mcp
+uv run uvicorn main:app --reload
+
+### Run MCP Interceptor
+```bash
+uv run fastmcp dev main.p
