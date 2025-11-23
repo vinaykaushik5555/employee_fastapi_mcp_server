@@ -190,17 +190,73 @@ class LeaveRepository:
         start_date: date,
         reason: str,
     ) -> LeaveRequestORM:
+        """
+        Apply for leave while enforcing business rules.
+
+        In addition to checking that the employee has sufficient leave
+        balance, this method now ensures that the employee does not
+        have an existing leave request that overlaps with the new
+        request's dates. If an overlapping request exists, a
+        ``ValueError`` is raised.
+
+        Args:
+            employee_id: ID of the employee requesting leave.
+            leave_type: Type of leave being requested.
+            days: Number of days requested (must be positive).
+            start_date: Start date of the leave.
+            reason: Free‑form reason for the leave.
+
+        Returns:
+            LeaveRequestORM: The persisted leave request.
+
+        Raises:
+            ValueError: If there is insufficient balance or an overlap
+                with existing leave requests.
+        """
+        # Fetch or create the current leave balance for the employee
         balance = self.get_or_create_balance(employee_id)
         available = self._get_available_days(balance, leave_type)
 
+        # Check if the requested days exceed the available balance
         if days > available:
             raise ValueError(
                 f"Insufficient balance for {leave_type.value}. "
                 f"available={available}, requested={days}"
             )
 
+        # Prevent overlapping leave requests
+        # Compute the end date (inclusive) for the new request. Using
+        # timedelta ensures proper date arithmetic even for fractional
+        # day values; a fractional day results in partial day overlap.
+        from datetime import timedelta
+
+        # Inclusive end date for new request
+        new_end = start_date + timedelta(days=days) - timedelta(days=1)
+
+        # Query all existing requests for the employee
+        existing_requests = (
+            self.db.query(LeaveRequestORM)
+            .filter(LeaveRequestORM.employee_id == employee_id)
+            .all()
+        )
+
+        for req in existing_requests:
+            # Compute the inclusive end date for the existing request
+            existing_start = req.start_date
+            existing_end = existing_start + timedelta(days=req.days) - timedelta(days=1)
+
+            # If the date ranges overlap, raise an error
+            if start_date <= existing_end and new_end >= existing_start:
+                raise ValueError(
+                    "Leave request overlaps with an existing request. "
+                    f"Existing: {existing_start} to {existing_end}, "
+                    f"New: {start_date} to {new_end}"
+                )
+
+        # Deduct the requested days from the balance
         self._deduct_days(balance, leave_type, days)
 
+        # Create and persist the new leave request
         request = LeaveRequestORM(
             employee_id=employee_id,
             leave_type=leave_type.value,
