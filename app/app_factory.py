@@ -1,26 +1,57 @@
-from __future__ import annotations
+# app/app_factory.py
 
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
 
+from .db import Base, engine, SessionLocal
+from .models import EmployeeORM, LeaveBalanceORM
+from .repository import EmployeeRepository
+from .domain import DEFAULT_CL, DEFAULT_PL, DEFAULT_ML, DEFAULT_OTHER
 from .api import router as employees_router
-from .db import init_db
+
+def create_default_admin():
+    db: Session = SessionLocal()
+    try:
+        admin = (
+            db.query(EmployeeORM)
+            .filter(EmployeeORM.username == "admin")
+            .first()
+        )
+        if admin is None:
+            admin = EmployeeORM(
+                id="admin",
+                username="admin",
+                password="admin",  # plain text
+                name="Administrator",
+                email="admin@company.com",
+                department="management",
+                is_active=True,
+                is_admin=True,
+            )
+            db.add(admin)
+
+            # default leave allocation
+            balance = LeaveBalanceORM(
+                employee_id="admin",
+                cl=DEFAULT_CL,
+                pl=DEFAULT_PL,
+                ml=DEFAULT_ML,
+                other=DEFAULT_OTHER,
+            )
+            db.add(balance)
+
+            db.commit()
+            db.refresh(admin)
+            print("💡 Default admin user created: username=admin, password=admin")
+    finally:
+        db.close()
 
 
 def create_app() -> FastAPI:
-    init_db()
+    Base.metadata.create_all(bind=engine)
+    create_default_admin()   # <-- add this line
 
-    app = FastAPI(title="Leave Management API (FastAPI + FastMCP + SQLite + Basic Auth)")
-
-    # CORS (relax for dev; tighten for prod)
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-
+    app = FastAPI(title="Employee + Leave Management System")
     app.include_router(employees_router)
 
     return app

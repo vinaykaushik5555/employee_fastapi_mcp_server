@@ -23,7 +23,11 @@ class EmployeeRepository:
     def __init__(self, db: Session) -> None:
         self.db = db
 
-    def create_employee(self, data: EmployeeCreate) -> EmployeeORM:
+    def create_employee(self, data: EmployeeCreate, *, is_admin: bool = False) -> EmployeeORM:
+        """
+        Create a new employee.
+        Also creates default leave balance for the new employee.
+        """
         existing = self.db.get(EmployeeORM, data.id)
         if existing:
             raise ValueError("Employee with this id already exists")
@@ -43,8 +47,20 @@ class EmployeeRepository:
             name=data.name,
             email=data.email,
             department=data.department,
+            is_admin=is_admin,
         )
         self.db.add(employee)
+
+        # create default leave balance row
+        balance = LeaveBalanceORM(
+            employee_id=data.id,
+            cl=DEFAULT_CL,
+            pl=DEFAULT_PL,
+            ml=DEFAULT_ML,
+            other=DEFAULT_OTHER,
+        )
+        self.db.add(balance)
+
         self.db.commit()
         self.db.refresh(employee)
         return employee

@@ -12,11 +12,12 @@ class EmployeeORM(Base):
 
     id = Column(String, primary_key=True, index=True)
     username = Column(String, unique=True, index=True, nullable=False)
-    password = Column(String, nullable=False)  # plain text
+    password = Column(String, nullable=False)  # plain text (dev only)
     name = Column(String, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
     department = Column(String, nullable=True)
     is_active = Column(Boolean, nullable=False, default=True)
+    is_admin = Column(Boolean, nullable=False, default=False)  # <-- admin flag
 
 
 class LeaveBalanceORM(Base):

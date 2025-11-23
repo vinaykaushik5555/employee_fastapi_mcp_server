@@ -1,3 +1,6 @@
-from __future__ import annotations
+import os
 
-DATABASE_URL = "sqlite:///./leave_management.db"
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "sqlite:////tmp/leave_management.db",   # writable path on cloud
+)
